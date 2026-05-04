@@ -1,12 +1,3 @@
-"""
-LLM rationale generation — one short sentence per retrieved standard.
-
-Primary: NVIDIA NIM (meta/llama-3.1-70b-instruct)
-Fallback: template-based (zero latency, zero API cost)
-
-Called in pipeline.py AFTER retrieval so it does NOT affect latency scoring
-if we skip it in inference.py mode. For the API/UI we call it to get rationale.
-"""
 from openai import OpenAI
 
 from src.config import (
@@ -16,20 +7,13 @@ from src.config import (
     LLM_BACKEND,
 )
 
-
 def _template_rationale(code: str, title: str, query: str) -> str:
-    """Fallback: deterministic rationale based on title keywords."""
     return (
         f"{code} — '{title}' directly specifies requirements "
         f"relevant to: {query[:80]}."
     )
 
-
 def _nvidia_rationale(query: str, standards: list[dict]) -> list[str]:
-    """
-    Call NVIDIA NIM once with all 5 standards to get rationale.
-    Returns list of rationale strings in same order as standards.
-    """
     client = OpenAI(api_key=NVIDIA_API_KEY, base_url=NVIDIA_BASE_URL)
 
     standards_block = "\n".join(
@@ -56,14 +40,11 @@ def _nvidia_rationale(query: str, standards: list[dict]) -> list[str]:
     text = response.choices[0].message.content.strip()
     lines = [l.strip() for l in text.splitlines() if l.strip()]
 
-    # Strip leading "1. ", "2. " etc.
     clean: list[str] = []
     for line in lines[:5]:
-        # Remove leading number + dot/paren
         stripped = line.lstrip("0123456789").lstrip(". )").strip()
         clean.append(stripped)
 
-    # Pad if model returned fewer than 5
     while len(clean) < len(standards):
         i = len(clean)
         s = standards[i]
@@ -71,16 +52,11 @@ def _nvidia_rationale(query: str, standards: list[dict]) -> list[str]:
 
     return clean
 
-
 def generate_rationales(
     query: str,
     standards: list[dict],
     backend: str = LLM_BACKEND,
 ) -> list[str]:
-    """
-    Return list of rationale strings (same length as standards).
-    standards: list of dicts with keys standard_code, title.
-    """
     if not standards:
         return []
     if backend == "nvidia" and NVIDIA_API_KEY:

@@ -1,13 +1,3 @@
-"""
-Run the RAG pipeline on the public test set and print evaluation metrics.
-
-Run from repo root:
-    python scripts/run_eval.py
-
-Outputs:
-  - Prints Hit Rate @3, MRR @5, Avg Latency to stdout
-  - Writes data/public_results.json
-"""
 import json
 import sys
 from pathlib import Path
@@ -18,7 +8,6 @@ from src.config import PUBLIC_TEST_SET, PUBLIC_RESULTS
 from src.chunker import get_chunks
 from src.pipeline import initialize, run_query
 from eval_script import normalize_std
-
 
 def compute_metrics(results):
     hits_at_3 = 0
@@ -40,7 +29,6 @@ def compute_metrics(results):
         "mrr_at_5": mrr_sum / n if n else 0,
         "avg_latency_seconds": total_latency / n if n else 0,
     }
-
 
 def main():
     if not PUBLIC_TEST_SET.exists():
@@ -75,7 +63,6 @@ def main():
             "latency_seconds": result.latency_seconds,
         })
 
-        # Print per-query result
         expected = item.get("expected_standards", [])
         hit = any(
             e.replace(" ", "").lower() in [r.replace(" ", "").lower() for r in result.retrieved_standards[:3]]
@@ -88,12 +75,10 @@ def main():
             f"({result.latency_seconds:.2f}s)"
         )
 
-    # Save results
     PUBLIC_RESULTS.parent.mkdir(parents=True, exist_ok=True)
     with open(PUBLIC_RESULTS, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
 
-    # Compute and print metrics
     metrics = compute_metrics(results)
 
     print("\n" + "=" * 50)
@@ -105,7 +90,6 @@ def main():
     print("=" * 50)
     print(f"\nResults saved to {PUBLIC_RESULTS}")
     print("Run `python eval_script.py --results data/public_results.json` to verify.")
-
 
 if __name__ == "__main__":
     main()

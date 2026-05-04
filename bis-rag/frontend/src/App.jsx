@@ -4,7 +4,6 @@ import ResultsView from "./components/ResultsView.jsx";
 import EvaluationView from "./components/EvaluationView.jsx";
 import { queryStandards } from "./utils/api.js";
 
-// Screens: "search" | "results" | "evaluation"
 export default function App() {
   const [screen, setScreen] = useState("search");
   const [loading, setLoading] = useState(false);

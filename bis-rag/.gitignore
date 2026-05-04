@@ -28,6 +28,13 @@ sample_output.json
 # Verification script — local dev tool, not needed by judges
 verify_submission.sh
 
+# Presentation and demo — share separately, not in source
+DEMO_SCRIPT.md
+SLIDES_OUTLINE.md
+presentation.pdf
+*.pptx
+*.key
+
 # Node
 frontend/node_modules/
 frontend/dist/

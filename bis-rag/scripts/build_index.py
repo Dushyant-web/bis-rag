@@ -1,9 +1,3 @@
-"""
-One-time script: PDF → chunks → embeddings → ChromaDB + BM25 ready.
-
-Run from repo root:
-    python scripts/build_index.py [--force]
-"""
 import argparse
 import sys
 from pathlib import Path
@@ -16,7 +10,6 @@ from src.whitelist import build_whitelist, save_whitelist
 from src.vector_store import index_chunks, collection_count
 from src.bm25_store import build_bm25_index
 
-
 def main():
     parser = argparse.ArgumentParser(description="Build BIS RAG index")
     parser.add_argument(
@@ -26,7 +19,6 @@ def main():
     )
     args = parser.parse_args()
 
-    # ── Step 1: Parse PDF ──────────────────────────────────────────────────────
     if args.force or not CHUNKS_FILE.exists():
         print(f"[build] Parsing PDF: {PDF_PATH}")
         if not PDF_PATH.exists():
@@ -48,7 +40,6 @@ def main():
             "Expected ~570. Check PDF parsing."
         )
 
-    # ── Step 2: Build whitelist ────────────────────────────────────────────────
     if args.force or not VALID_CODES_FILE.exists():
         whitelist = build_whitelist(chunks)
         save_whitelist(whitelist)
@@ -58,12 +49,10 @@ def main():
         whitelist = load_whitelist()
         print(f"[build] Loaded whitelist: {len(whitelist)} valid IS codes")
 
-    # ── Step 3: BM25 index (in-memory, just verify it builds) ─────────────────
     print("[build] Building BM25 index…")
     build_bm25_index(chunks)
     print("[build] BM25 index built.")
 
-    # ── Step 4: Vector embeddings → ChromaDB ──────────────────────────────────
     existing = collection_count()
     if not args.force and existing >= len(chunks) * 0.9:
         print(f"[build] ChromaDB already has {existing} docs. Skipping re-embed.")
@@ -73,7 +62,6 @@ def main():
         index_chunks(chunks)
         print(f"[build] ChromaDB has {collection_count()} documents.")
 
-    # ── Summary ────────────────────────────────────────────────────────────────
     print("\n" + "=" * 50)
     print("  BUILD COMPLETE")
     print("=" * 50)
@@ -82,7 +70,6 @@ def main():
     print(f"  ChromaDB docs:       {collection_count()}")
     print("=" * 50)
     print("\nNext step: python scripts/run_eval.py")
-
 
 if __name__ == "__main__":
     main()

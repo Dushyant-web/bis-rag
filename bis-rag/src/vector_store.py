@@ -1,12 +1,3 @@
-"""
-ChromaDB wrapper — persist-to-disk vector store for BIS standard chunks.
-
-Collection schema per document:
-  id:        chunk_id
-  embedding: float vector
-  document:  full_text (used for display)
-  metadata:  {standard_code, title, section_name}
-"""
 import chromadb
 from chromadb.config import Settings
 
@@ -16,7 +7,6 @@ from src.embedder import embed_texts, embed_query, EMBED_BACKEND
 
 _client: chromadb.PersistentClient | None = None
 _collection = None
-
 
 def _get_collection():
     global _client, _collection
@@ -33,12 +23,9 @@ def _get_collection():
     )
     return _collection
 
-
 def index_chunks(chunks: list[BISChunk], batch_size: int = 64) -> None:
-    """Embed all chunks and upsert into ChromaDB."""
     col = _get_collection()
 
-    # Build text for embedding: title + full_text (truncated to ~512 tokens)
     texts = [
         f"{c.standard_code} {c.title}\n{c.full_text[:1500]}"
         for c in chunks
@@ -66,12 +53,7 @@ def index_chunks(chunks: list[BISChunk], batch_size: int = 64) -> None:
         )
     print(f"[vector_store] Indexed {len(chunks)} documents.")
 
-
 def vector_search(query: str, top_k: int = VECTOR_TOP_K) -> list[dict]:
-    """
-    Return top_k results as list of dicts:
-        {standard_code, title, section_name, full_text, score}
-    """
     col = _get_collection()
     q_vec = embed_query(query)
     results = col.query(
@@ -91,11 +73,10 @@ def vector_search(query: str, top_k: int = VECTOR_TOP_K) -> list[dict]:
                 "title": meta["title"],
                 "section_name": meta["section_name"],
                 "full_text": doc,
-                "score": float(1.0 - dist),  # cosine similarity
+                "score": float(1.0 - dist),
             }
         )
     return output
-
 
 def collection_count() -> int:
     return _get_collection().count()

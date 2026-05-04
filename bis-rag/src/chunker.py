@@ -1,6 +1,3 @@
-"""
-Build BISChunk objects from parsed PDF blocks and cache them to disk.
-"""
 import json
 from pathlib import Path
 from tqdm import tqdm
@@ -9,15 +6,12 @@ from src.schema import BISChunk
 from src.pdf_parser import iter_standard_blocks
 from src.config import CHUNKS_FILE, PDF_PATH
 
-
 def build_chunks(pdf_path: Path = PDF_PATH) -> list[BISChunk]:
-    """Parse PDF and return list of BISChunk objects."""
     chunks: list[BISChunk] = []
     seen_codes: set[str] = set()
 
     for i, block in enumerate(tqdm(iter_standard_blocks(pdf_path), desc="Parsing standards")):
         code = block["standard_code"]
-        # Deduplicate — keep first occurrence if same code appears twice
         chunk_id = f"chunk_{i:04d}"
         if code in seen_codes:
             chunk_id = f"chunk_{i:04d}_dup"
@@ -36,21 +30,17 @@ def build_chunks(pdf_path: Path = PDF_PATH) -> list[BISChunk]:
 
     return chunks
 
-
 def save_chunks(chunks: list[BISChunk], path: Path = CHUNKS_FILE) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump([c.model_dump() for c in chunks], f, ensure_ascii=False, indent=2)
-
 
 def load_chunks(path: Path = CHUNKS_FILE) -> list[BISChunk]:
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     return [BISChunk(**d) for d in data]
 
-
 def get_chunks(force_rebuild: bool = False) -> list[BISChunk]:
-    """Return cached chunks; rebuild from PDF if cache missing or force_rebuild."""
     if not force_rebuild and CHUNKS_FILE.exists():
         return load_chunks()
     if not PDF_PATH.exists():
