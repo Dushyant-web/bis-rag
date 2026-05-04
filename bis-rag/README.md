@@ -1,88 +1,5 @@
 # BIS Compliance Engine
 
-**BIS × SS Hackathon 2026 — RAG Track**
-
-> Type a product description → get the top 5 applicable Indian Standards in under 1 second.
-
-**Scores on public test set (10 queries):**
-
-| Metric | Score | Target |
-|---|---|---|
-| Hit Rate @3 | **100%** | > 80% |
-| MRR @5 | **0.9000** | > 0.70 |
-| Avg Latency | **0.83s** | < 5.0s |
-| Hallucinations | **0** | 0 |
-
----
-
-## How It Works
-
-The source document is SP 21 (2005) — a 929-page PDF published by BIS containing summaries of 557 Indian Standards for building materials (Cement, Steel, Concrete, Aggregates).
-
-### The Pipeline (per query)
-
-```
-User query
-    │
-    ▼
-Query Expansion          — synonym dict adds "portland", "opc", etc. (0ms)
-    │
-    ├──────────────────────┐
-    ▼                      ▼
-BM25 retrieval         Vector retrieval
-(top 25)               (top 25)
-exact code match       semantic similarity
-    │                      │
-    └──────────┬────────────┘
-               ▼
-         Merge unique
-         (~35 candidates)
-               │
-               ▼
-     Cross-encoder rerank         — scores actual query-doc pairs
-     (top 5)
-               │
-               ▼
-       Whitelist filter           — only real IS codes pass
-               │
-               ▼
-         Top 5 results
-         + confidence score
-         + 1-line rationale (UI mode)
-```
-
-**Total latency: ~0.83s average on 10 queries (no GPU, Apple Silicon M-series)**
-
-### Why These Scores?
-
-**1. Standard-boundary chunking** — Instead of splitting the PDF by character count (which bleeds text from one standard into another), we split on the `SUMMARY OF` marker that begins every standard in SP 21. Result: 557 atomic chunks, each = exactly one BIS standard. Zero contamination.
-
-**2. Hybrid BM25 + Vector retrieval** — BM25 catches exact IS code matches (`IS 269` in the query → guaranteed hit). Vector search catches semantic synonyms (`lightweight blocks` → `hollow concrete masonry units`). Neither alone is sufficient.
-
-**3. Cross-encoder reranking** — After merging 35–50 candidates, a cross-encoder (`ms-marco-MiniLM-L-6-v2`) scores each query-document pair directly. This is far more accurate than cosine similarity because it sees the query and document together.
-
-**4. Hallucination whitelist** — At build time we extract all 777 valid IS codes from the PDF into a set. Before returning any result, every code is checked against this set. It is structurally impossible to return a code that doesn't exist in the document.
-
-**5. Query expansion** — A hardcoded synonym dictionary (zero latency, no LLM call) expands queries before retrieval. `cement` → adds `portland`, `opc`, `hydraulic`, `slag`. `block` → adds `masonry unit`, `hollow blocks`. Bridges the vocabulary gap between user language and PDF language.
-
-**6. Model pre-warming** — All models (cross-encoder, embedder, ChromaDB) are loaded into RAM during startup, before the first query. Eliminates the 40s cold-start penalty on the first query.
-
----
-
-## Tech Stack
-
-| Component | Tool |
-|---|---|
-| PDF parsing | `pdfplumber` (pure Python) |
-| BM25 retrieval | `rank-bm25` |
-| Vector store | `ChromaDB` (local, disk-persisted) |
-| Embeddings | NVIDIA NIM `nv-embedqa-e5-v5` → fallback: `BAAI/bge-small-en-v1.5` |
-| Reranking | `cross-encoder/ms-marco-MiniLM-L-6-v2` (CPU, ~200ms) |
-| LLM rationale | NVIDIA NIM `meta/llama-3.1-70b-instruct` → fallback: template |
-| Backend API | FastAPI + Uvicorn |
-| Frontend | React 18 + Vite (plain CSS, no Tailwind) |
-
----
 
 ## Setup
 
@@ -230,6 +147,92 @@ python eval_script.py --results team_results.json
 `inference.py` never crashes — every query is wrapped in try/except and returns empty results on failure rather than exiting.
 
 ---
+
+
+**BIS × SS Hackathon 2026 — RAG Track**
+
+> Type a product description → get the top 5 applicable Indian Standards in under 1 second.
+
+**Scores on public test set (10 queries):**
+
+| Metric | Score | Target |
+|---|---|---|
+| Hit Rate @3 | **100%** | > 80% |
+| MRR @5 | **0.9000** | > 0.70 |
+| Avg Latency | **0.83s** | < 5.0s |
+| Hallucinations | **0** | 0 |
+
+---
+
+## How It Works
+
+The source document is SP 21 (2005) — a 929-page PDF published by BIS containing summaries of 557 Indian Standards for building materials (Cement, Steel, Concrete, Aggregates).
+
+### The Pipeline (per query)
+
+```
+User query
+    │
+    ▼
+Query Expansion          — synonym dict adds "portland", "opc", etc. (0ms)
+    │
+    ├──────────────────────┐
+    ▼                      ▼
+BM25 retrieval         Vector retrieval
+(top 25)               (top 25)
+exact code match       semantic similarity
+    │                      │
+    └──────────┬────────────┘
+               ▼
+         Merge unique
+         (~35 candidates)
+               │
+               ▼
+     Cross-encoder rerank         — scores actual query-doc pairs
+     (top 5)
+               │
+               ▼
+       Whitelist filter           — only real IS codes pass
+               │
+               ▼
+         Top 5 results
+         + confidence score
+         + 1-line rationale (UI mode)
+```
+
+**Total latency: ~0.83s average on 10 queries (no GPU, Apple Silicon M-series)**
+
+### Why These Scores?
+
+**1. Standard-boundary chunking** — Instead of splitting the PDF by character count (which bleeds text from one standard into another), we split on the `SUMMARY OF` marker that begins every standard in SP 21. Result: 557 atomic chunks, each = exactly one BIS standard. Zero contamination.
+
+**2. Hybrid BM25 + Vector retrieval** — BM25 catches exact IS code matches (`IS 269` in the query → guaranteed hit). Vector search catches semantic synonyms (`lightweight blocks` → `hollow concrete masonry units`). Neither alone is sufficient.
+
+**3. Cross-encoder reranking** — After merging 35–50 candidates, a cross-encoder (`ms-marco-MiniLM-L-6-v2`) scores each query-document pair directly. This is far more accurate than cosine similarity because it sees the query and document together.
+
+**4. Hallucination whitelist** — At build time we extract all 777 valid IS codes from the PDF into a set. Before returning any result, every code is checked against this set. It is structurally impossible to return a code that doesn't exist in the document.
+
+**5. Query expansion** — A hardcoded synonym dictionary (zero latency, no LLM call) expands queries before retrieval. `cement` → adds `portland`, `opc`, `hydraulic`, `slag`. `block` → adds `masonry unit`, `hollow blocks`. Bridges the vocabulary gap between user language and PDF language.
+
+**6. Model pre-warming** — All models (cross-encoder, embedder, ChromaDB) are loaded into RAM during startup, before the first query. Eliminates the 40s cold-start penalty on the first query.
+
+---
+
+## Tech Stack
+
+| Component | Tool |
+|---|---|
+| PDF parsing | `pdfplumber` (pure Python) |
+| BM25 retrieval | `rank-bm25` |
+| Vector store | `ChromaDB` (local, disk-persisted) |
+| Embeddings | NVIDIA NIM `nv-embedqa-e5-v5` → fallback: `BAAI/bge-small-en-v1.5` |
+| Reranking | `cross-encoder/ms-marco-MiniLM-L-6-v2` (CPU, ~200ms) |
+| LLM rationale | NVIDIA NIM `meta/llama-3.1-70b-instruct` → fallback: template |
+| Backend API | FastAPI + Uvicorn |
+| Frontend | React 18 + Vite (plain CSS, no Tailwind) |
+
+---
+
 
 ## Project Structure
 
