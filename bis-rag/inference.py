@@ -1,21 +1,4 @@
-"""
-inference.py — Judge entry point.
 
-Usage:
-    python inference.py --input hidden_private_dataset.json --output team_results.json
-
-Reads a JSON list from --input. Each item has:
-    id, query, expected_standards (and possibly other fields)
-
-Writes a JSON list to --output. Each item has EXACTLY:
-    id                   — from input
-    query                — from input
-    expected_standards   — PASSTHROUGH from input (required by eval_script.py)
-    retrieved_standards  — list[str], canonical IS codes, top-5
-    latency_seconds      — float
-
-CRITICAL: Never crashes — all errors are caught and produce empty results.
-"""
 import argparse
 import json
 import sys
@@ -30,8 +13,16 @@ from src.pipeline import initialize, run_query
 
 
 def load_index():
-    """Load chunks and build in-memory BM25 index. Called once."""
+    """Load chunks, auto-build ChromaDB if missing, then warm all models."""
     chunks = get_chunks()
+
+    from src.config import CHROMA_DIR
+    from src.vector_store import collection_count, index_chunks
+    if not CHROMA_DIR.exists() or collection_count() < len(chunks) * 0.9:
+        print("[inference] ChromaDB missing or incomplete — building embeddings now…")
+        print("[inference] This takes 2-5 min on first run, then cached forever.")
+        index_chunks(chunks)
+
     initialize(chunks)
     return chunks
 
